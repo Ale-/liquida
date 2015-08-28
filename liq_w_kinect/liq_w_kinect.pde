@@ -18,10 +18,10 @@ SimpleOpenNI  kinect;
 
 
 //HD resolution
-int w = 1280, h = 720;
-//int w = 1920, h = 1080;
+//int w = 1400, h = 1050;
+int w = 1920, h = 1080;
 //Other geometry settings
-int wh, size, w_2, h_2, dx, dy, oldind, newind, mapind, radius = 5, i, a, b, px, py;
+int wh, size, w_2, h_2, dx, dy, oldind, newind, mapind, radius = 10, i, a, b, px, py;
 float fx, fy;
 int
   title_color = 0xff0000ff,
@@ -44,6 +44,20 @@ String
     exp = "A digital tiling project by Javi Aldarias and wwb.cc",
     callibrating_text = "Hello! Wait a sec, we're callibrating your body";
      
+int[] pal = {#1d2536, #3b539b, #d7d6f8, #bccbf6, #2a2867, #496cca};
+int[] userList; 
+Truchet t;
+String rule;
+int[][][] rules;
+int current_rule;
+int current_zoom = 2;
+int zoom_f = 4;
+//int buckets = 80 / zoom_f;
+//int bucket  = 10 * zoom_f;
+int bucket = w/20, buckets_x= w/bucket, buckets_y = h/bucket; 
+
+boolean debugging = true, callibrated = false;
+     
 void setup()
 {
     size(w, h);
@@ -61,17 +75,17 @@ void setup()
     w_2 = w / 2;
     h_2 = h / 2;
     //Kinect resolution
-    dx = w_2 + kw/2;
+    dx = w_2 - kw/2;
     dy = h_2 - kh/2;
-    fy = h / float(kh);
-    fx = w / float(kw);
+    //fy = h / float(kh);
+    //fx = w / float(kw);
    
     oldind = w; 
     newind = w * (h+3); 
     
     //Buffer settings
-    texture = loadImage("test_720.jpg");   
-    texture.loadPixels();
+    //texture = loadImage("test_720.jpg");   
+    
     ripplemap = new int[size];
     ripple    = new int[wh];
     
@@ -92,17 +106,28 @@ void setup()
     lefthand_2d = new PVector();
     righthand_2d = new PVector();
     
-    //splash();
+    t = new Truchet();
+    rules = t.createRules(0, 1, 2, 3);
+    current_rule = int(random(rules.length));
+    texture = truchet();
+    texture.loadPixels();
 }
  
-void draw(){
-    //splash.callibrating();     
+void draw(){   
     kinect.update();
     splash();
-    if(users) { 
+    userList = kinect.getUsers();
+    
+    if(users && !callibrated) { 
         callibrating();
+        for(int i = 0; i < userList.length; i++) 
+        {
+            //If callibration is completed, proceed
+            if(kinect.isTrackingSkeleton(userList[i])) callibrated = true;
+            break;  
+        }
     }
-    if (users && !callibrating) 
+    if (users && callibrated) 
     {
         background(texture);
         loadPixels();
@@ -128,33 +153,36 @@ void draw(){
           arrayCopy(ripple, 0, pixels, 0, wh);  
           updatePixels();    
         
-        
-        int[] userList = kinect.getUsers();
         for(int i = 0; i < userList.length; i++) 
         {
             //If callibration is completed, proceed
             if(kinect.isTrackingSkeleton(userList[i]))
             {          
-              //lefthand 
-              confidence = kinect.getJointPositionSkeleton(userList[i], SimpleOpenNI.SKEL_LEFT_HAND, lefthand_3d);
-              kinect.convertRealWorldToProjective(lefthand_3d, lefthand_2d);
-              px = dx - int(lefthand_2d.x);
-              py = int(lefthand_2d.y) + dy;
-              //ellipse(px, py, 50, 50);
-              for (int y = py - radius; y < py + radius; y++) 
-                for (int x = px - radius; x < px + radius; x++) 
-                    if (y >= 0 && y < h && x >=0 && x < w) 
-                        ripplemap[oldind + (y*w) + x] += 128;            
-              //righthand      
-              confidence = kinect.getJointPositionSkeleton(userList[i], SimpleOpenNI.SKEL_RIGHT_HAND, righthand_3d);
-              kinect.convertRealWorldToProjective(righthand_3d, righthand_2d);         
-              px = dx - int(righthand_2d.x);
-              py = int(righthand_2d.y) + dy;
-              //ellipse(px, py, 50, 50);
-              for (int y = py - radius; y < py + radius; y++) 
-                for (int x = px - radius; x < px + radius; x++) 
-                    if (y >= 0 && y < h && x >=0 && x < w) 
-                        ripplemap[oldind + (y*w) + x] += 128;               
+                //lefthand 
+                kinect.getJointPositionSkeleton(userList[i], SimpleOpenNI.SKEL_LEFT_HAND, lefthand_3d);
+                kinect.convertRealWorldToProjective(lefthand_3d, lefthand_2d);
+                //px = dx - int(lefthand_2d.x);
+                px = int(lefthand_2d.x) + dx;
+                py = int(lefthand_2d.y) + dy;
+                for (int y = py - radius; y < py + radius; y++) 
+                  for (int x = px - radius; x < px + radius; x++) 
+                      if (y >= 0 && y < h && x >=0 && x < w) 
+                          ripplemap[oldind + (y*w) + x] += 128;            
+                //righthand      
+                kinect.getJointPositionSkeleton(userList[i], SimpleOpenNI.SKEL_RIGHT_HAND, righthand_3d);
+                kinect.convertRealWorldToProjective(righthand_3d, righthand_2d);         
+                //px = dx - int(righthand_2d.x);
+                px = int(righthand_2d.x) + dx;
+                py = int(righthand_2d.y) + dy;
+                for (int y = py - radius; y < py + radius; y++) 
+                  for (int x = px - radius; x < px + radius; x++) 
+                      if (y >= 0 && y < h && x >=0 && x < w) 
+                          ripplemap[oldind + (y*w) + x] += 128;               
+                if(debugging){
+                    stroke(#ff0000);
+                    strokeWeight(5);
+                    drawSkeleton(userList[i]);
+                }          
             }
         }    
     }
@@ -170,25 +198,13 @@ void onNewUser(SimpleOpenNI curkinect, int userId)
     curkinect.startTrackingSkeleton(userId);
 }
 
-void onLostUser(SimpleOpenNI curContext, int userId)
+void onLostUser(SimpleOpenNI curkinect, int userId)
 {
   println("onLostUser - userId: " + userId);
-}
-
-/* user-tracking callbacks!
-void onNewUser(int userId) {
-    println("start pose detection");
-    kinect.startPoseDetection("Psi", userId);
-}*/
-
-void onEndCalibration(int userId, boolean successful) {
-    if (successful) {
-        println(" User calibrated !!!");
-        callibrating = false;
-        kinect.startTrackingSkeleton(userId);
-    } else {
-        println(" Failed to calibrate user !!!");
-    }
+  if(userList.length <= 0) {
+      users = false;
+      callibrating = false;  
+  }
 }
 
 
@@ -206,4 +222,70 @@ void splash() {
     textFont(reg, text_size);
     fill(text_color);
     text(exp, w - padding - textWidth(exp), h - padding - textAscent() - textDescent());        
+}
+
+
+// draw the skeleton with the selected joints
+void drawSkeleton(int userId)
+{
+  drawLine(userId, SimpleOpenNI.SKEL_HEAD, SimpleOpenNI.SKEL_NECK);
+  drawLine(userId, SimpleOpenNI.SKEL_NECK, SimpleOpenNI.SKEL_LEFT_SHOULDER);
+  drawLine(userId, SimpleOpenNI.SKEL_LEFT_SHOULDER, SimpleOpenNI.SKEL_LEFT_ELBOW);
+  drawLine(userId, SimpleOpenNI.SKEL_LEFT_ELBOW, SimpleOpenNI.SKEL_LEFT_HAND);
+  drawLine(userId, SimpleOpenNI.SKEL_NECK, SimpleOpenNI.SKEL_RIGHT_SHOULDER);
+  drawLine(userId, SimpleOpenNI.SKEL_RIGHT_SHOULDER, SimpleOpenNI.SKEL_RIGHT_ELBOW);
+  drawLine(userId, SimpleOpenNI.SKEL_RIGHT_ELBOW, SimpleOpenNI.SKEL_RIGHT_HAND);
+  drawLine(userId, SimpleOpenNI.SKEL_LEFT_SHOULDER, SimpleOpenNI.SKEL_TORSO);
+  drawLine(userId, SimpleOpenNI.SKEL_RIGHT_SHOULDER, SimpleOpenNI.SKEL_TORSO);
+  drawLine(userId, SimpleOpenNI.SKEL_TORSO, SimpleOpenNI.SKEL_LEFT_HIP);
+  drawLine(userId, SimpleOpenNI.SKEL_LEFT_HIP, SimpleOpenNI.SKEL_LEFT_KNEE);
+  drawLine(userId, SimpleOpenNI.SKEL_LEFT_KNEE, SimpleOpenNI.SKEL_LEFT_FOOT);
+  drawLine(userId, SimpleOpenNI.SKEL_TORSO, SimpleOpenNI.SKEL_RIGHT_HIP);
+  drawLine(userId, SimpleOpenNI.SKEL_RIGHT_HIP, SimpleOpenNI.SKEL_RIGHT_KNEE);
+  drawLine(userId, SimpleOpenNI.SKEL_RIGHT_KNEE, SimpleOpenNI.SKEL_RIGHT_FOOT);  
+}
+  
+
+
+/* draw the skeleton with the selected joints
+void drawSkeleton(int userId)
+{
+  // to get the 3d joint data
+  PVector jointPos = new PVector();
+  kinect.getJointPositionSkeleton(userId,SimpleOpenNI.SKEL_NECK,jointPos);
+  println(jointPos);
+  
+  kinect.drawLimb(userId, SimpleOpenNI.SKEL_HEAD, SimpleOpenNI.SKEL_NECK);
+
+  kinect.drawLimb(userId, SimpleOpenNI.SKEL_NECK, SimpleOpenNI.SKEL_LEFT_SHOULDER);
+  kinect.drawLimb(userId, SimpleOpenNI.SKEL_LEFT_SHOULDER, SimpleOpenNI.SKEL_LEFT_ELBOW);
+  kinect.drawLimb(userId, SimpleOpenNI.SKEL_LEFT_ELBOW, SimpleOpenNI.SKEL_LEFT_HAND);
+
+  kinect.drawLimb(userId, SimpleOpenNI.SKEL_NECK, SimpleOpenNI.SKEL_RIGHT_SHOULDER);
+  kinect.drawLimb(userId, SimpleOpenNI.SKEL_RIGHT_SHOULDER, SimpleOpenNI.SKEL_RIGHT_ELBOW);
+  kinect.drawLimb(userId, SimpleOpenNI.SKEL_RIGHT_ELBOW, SimpleOpenNI.SKEL_RIGHT_HAND);
+
+  kinect.drawLimb(userId, SimpleOpenNI.SKEL_LEFT_SHOULDER, SimpleOpenNI.SKEL_TORSO);
+  kinect.drawLimb(userId, SimpleOpenNI.SKEL_RIGHT_SHOULDER, SimpleOpenNI.SKEL_TORSO);
+
+  kinect.drawLimb(userId, SimpleOpenNI.SKEL_TORSO, SimpleOpenNI.SKEL_LEFT_HIP);
+  kinect.drawLimb(userId, SimpleOpenNI.SKEL_LEFT_HIP, SimpleOpenNI.SKEL_LEFT_KNEE);
+  kinect.drawLimb(userId, SimpleOpenNI.SKEL_LEFT_KNEE, SimpleOpenNI.SKEL_LEFT_FOOT);
+
+  kinect.drawLimb(userId, SimpleOpenNI.SKEL_TORSO, SimpleOpenNI.SKEL_RIGHT_HIP);
+  kinect.drawLimb(userId, SimpleOpenNI.SKEL_RIGHT_HIP, SimpleOpenNI.SKEL_RIGHT_KNEE);
+  kinect.drawLimb(userId, SimpleOpenNI.SKEL_RIGHT_KNEE, SimpleOpenNI.SKEL_RIGHT_FOOT);  
+}*/
+
+void drawLine(int userId, int jointA, int jointB){
+   PVector a3d = new PVector();
+   PVector b3d = new PVector();
+   PVector a2d = new PVector();
+   PVector b2d = new PVector();  
+   float confidence = kinect.getJointPositionSkeleton(userId, jointA, a3d);
+   kinect.convertRealWorldToProjective(a3d, a2d);
+   confidence = kinect.getJointPositionSkeleton(userId, jointB, b3d);
+   kinect.convertRealWorldToProjective(b3d, b2d);
+   line(b2d.x + dx, b2d.y + dy, a2d.x + dx, a2d.y + dy);
+  
 }
