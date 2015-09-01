@@ -1,2 +1,2 @@
-# liquida
-Software for Liquida installation, a project by Javi Aldarias and wwb.
+# Liquid-A
+Software for Liquid-A installation, a project by [Javi Aldarias](http://javialdarias.org/) and [wwb](wwb.cc). This installation was premiered in the [Aura](http://aurafestival.pt/) international light art festival, in Sintra (Portugal) in August 2015. Liquid-A is an essay about space, it aims to create an urban scenery where the immediate environment react to pedestrians. Visually it relies on the iconography of Portuguese houses with tile facade, these patterns are deformed reacting to movements of people. A kind of liquid architecture .
