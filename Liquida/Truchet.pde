@@ -1,81 +1,100 @@
-Truchet t;
-String rule;
-int[][][] rules;
-int current_rule;
-int current_zoom = 2;
-int zoom_f = 4;
-//int buckets = 80 / zoom_f;
-//int bucket  = 10 * zoom_f;
-int bucket = w/40, buckets_x= w/bucket, buckets_y = h/bucket +1; 
-int[] pal = {#1d2536, #3b539b, #d7d6f8, #bccbf6, #2a2867, #496cca};
-
-void keyPressed()
+/**
+ *  PaletteTruchetDisplayer
+ *  Displays truchet rules in the classic way, using random colors from a given palette
+ */
+class PaletteTruchetDisplayer extends TruchetRules 
 {
-    if      (key == 'a') current_rule = (current_rule - 1 + rules.length) % rules.length;
-    else if (key == 'd') current_rule = (current_rule + 1) % rules.length;
-    /*else if (key == 'w') zoom(1);
-    else if (key == 'x') zoom(-1);*/
-    texture = truchet(); 
-}
-
-PImage truchet()
-{
-    PGraphics texture = createGraphics(w, h);
-    texture.beginDraw();
-    texture.background(-1);
-    texture.noStroke();
-    int[][] ruls = rules[current_rule];   
-    for(int y = 0; y < buckets_y; y++) for(int x = 0; x < buckets_x; x++)
-    {
-      int x_alpha = x * bucket;
-      int y_alpha = y * bucket;
-      int x_omega = x_alpha + bucket;
-      int y_omega = y_alpha + bucket;
-      int pattern_y = y % ruls.length;
-      int r = ruls[pattern_y][x % ruls[pattern_y].length];
-      texture.fill(pal[int(random(pal.length))]);
-      switch(r) {
-        case 0: texture.triangle(x_alpha, y_alpha, x_omega, y_alpha, x_alpha, y_omega); break;
-        case 1: texture.triangle(x_omega, y_alpha, x_omega, y_omega, x_alpha, y_alpha); break;
-        case 2: texture.triangle(x_omega, y_omega, x_alpha, y_omega, x_omega, y_alpha); break;
-        case 3: texture.triangle(x_alpha, y_omega, x_alpha, y_alpha, x_omega, y_omega); break;      
-      }
+    int[] pal;
+    int w, h, bucket, buckets_x, buckets_y;
+  
+    PaletteTruchetDisplayer(int w, int h, int bucket, int... colors){
+        this.w = w;
+        this.h = h;
+        this.bucket = bucket;
+        buckets_x = w/bucket; 
+        buckets_y = h/bucket + 1; 
+        pal = colors;  
     }
-    texture.endDraw(); 
-    return texture;
+  
+    /**
+     *  Truchet
+     *  Responsible of 'what to do' with the truchet pattern
+     */
+    PImage truchet() {
+        PGraphics texture = createGraphics(w, h);
+        texture.beginDraw();
+        texture.background(-1);
+        texture.noStroke();
+        int[][] ruls = rules[current_rule];   
+        for(int y = 0; y < buckets_y; y++) for(int x = 0; x < buckets_x; x++)
+        {
+          int x_alpha = x * bucket;
+          int y_alpha = y * bucket;
+          int x_omega = x_alpha + bucket;
+          int y_omega = y_alpha + bucket;
+          int pattern_y = y % ruls.length;
+          int r = ruls[pattern_y][x % ruls[pattern_y].length];
+          texture.fill(pal[int(random(pal.length))]);
+          switch(r) {
+            case 0: texture.triangle(x_alpha, y_alpha, x_omega, y_alpha, x_alpha, y_omega); break;
+            case 1: texture.triangle(x_omega, y_alpha, x_omega, y_omega, x_alpha, y_alpha); break;
+            case 2: texture.triangle(x_omega, y_omega, x_alpha, y_omega, x_omega, y_alpha); break;
+            case 3: texture.triangle(x_alpha, y_omega, x_alpha, y_alpha, x_omega, y_omega); break;      
+          }
+        }
+        texture.endDraw(); 
+        return texture;
+    }
+  
 }
-
-/*void zoom(int z)
-{
-    current_zoom += z;
-    if(current_zoom < 0) current_zoom = 0;
- 
-    zoom_f = int(pow(2, current_zoom));
-    buckets = 96 / zoom_f;
-    bucket  = 10 * zoom_f; 
-}*/
 
 /**
- *  Truchet Class
+ *  TruchetRules Class
  *  Generates Truchet compositions based on the original ones as described in "Description des Metiers" (Sebastien Truchet, 1705)
  *  See [http://jacques-andre.fr/faqtypo/truchet/truchet-planches.pdf]
  */
-class Truchet
+abstract class TruchetRules
 { 
     //The alphabet employed by Truchet in order to generate the name of the different rules
     String[] alphabet = new String[]
     {"A",  "B",  "C",  "D",  "E",  "F",  "G",  "H",  "I",  "K",  "L",  "M",
      "N",  "O",  "P",  "Q",  "R",  "S",  "T",  "V",  "U",  "X",  "Y",  "Z"};
    
+    String rule;
+    int[][][] rules;
+    int current_rule;
+   
+    /**
+     *  Truchet
+     *  This abstract method is the responsible of 'what to do' with the truchet pattern
+     */
+    abstract PImage truchet();
+
+    /**
+     *  Sets the current rule in the alphabet
+     *  @param n the index of the rule in the set
+     */   
+    void setCurrentRule(int n){
+        if(rules == null) return;
+        current_rule = n;  
+    }
+    
+    /**
+     *  Sets a random rule
+     */
+    void setRandomRule()
+    {       
+        setCurrentRule( int ( random(rules.length) ) ); 
+    }
+   
     /**
      *  Creates a new set of rules. This was reeaally boring. @_@
      *  If I was smarter I would have discovered some magic mathematics behind all, maybe the origin of the universe.
-     *  But I'm not.
-     */
-    int[][][] createRules(int a, int b, int c, int d)
+     *  But I'm not.  
+     */       
+    void setRules(int a, int b, int c, int d)
     {
-        return new int[][][]
-        {  
+        rules = new int[][][] {  
             //Premiere planche          
             //A
             {{a, c},

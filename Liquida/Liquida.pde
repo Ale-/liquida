@@ -1,9 +1,25 @@
 /**
  *  Liquid-a
  *  Software for the installation Liquid-a, in the Aura festival, Sintra, 2015
- *  A project by Javi Aldarias and wwb
- *  Ale, 2015
+ *  A project by Javi Aldarias [javialdarias.org] and wwb [wwb.cc]
+ *
+ *  Copyright (c) 2015 Ale González
+ *    
+ *  This software is free; you can redistribute it and/or
+ *  modify it under the terms of the GNU Lesser General Public
+ *  License version 2.1 as published by the Free Software Foundation.
+ *    
+ *  This software is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ *  Lesser General Public License for more details.
+ *    
+ *  You should have received a copy of the GNU Lesser General
+ *  Public License along with this library; if not, write to the
+ *  Free Software Foundation, Inc., 59 Temple Place, Suite 330,
+ *  Boston, MA 02111-1307 USA
  */
+ 
  
 //SimpleOpenNI 
 import SimpleOpenNI.*;
@@ -13,6 +29,12 @@ SimpleOpenNI  kinect;
 import blobDetection.*; 
 BlobDetection bd;
 Blob blob;
+
+//Blur effect
+FastBlur fast;
+
+//Truchet pattern generator
+ PaletteTruchetDisplayer t;
 
 //Global variables
 int
@@ -25,38 +47,27 @@ int
   oldind, newind, mapind, 
   radius = 5, 
   a, b,
-  blob_resolution = 8,
+  blob_resolution = 8,   //inverse proportion
   current_time;
-    
-short 
-  data;
-PImage 
-  cam, texture, blobs;
-int[] 
-  ripplemap, ripple;
-ArrayList<PVector> 
-  visitors;     
-float tt = .85;
-//Splash screen settings
-Boolean
-  splash = false,
-  debugging = false,
-  users = false, 
-  text = false;
-int    
-  users_n,
-  splash_timer,
-  splash_bg = #ff0000,
-  splash_timeout = 20;  
-PImage 
-  splash_init,
-  splash_es;
-float  
-  splash_alpha = 0f,
-  splash_alpha_two = 0f,
-  bg_alpha = 255f;
 
+float 
+  tt = .85,         //Brightness threshold for the blob detection  
+  bg_alpha = 255f;  //Alpha for the background transitions
+
+//Particles in the blob boundary that interact with the texture  
+ArrayList<PVector> visitors;     
+    
+short data;
   
+PImage 
+  cam, 
+  texture, 
+  blobs;
+int[] 
+  ripplemap, 
+  ripple;
+
+
 void setup()
 {
     size(w, h);
@@ -84,16 +95,16 @@ void setup()
     }
     
     //Truchet settings
-    t = new Truchet();
-    rules = t.createRules(0, 1, 2, 3);
-    current_rule = int(random(rules.length));
-    texture = truchet();
+    PaletteTruchetDisplayer t = new PaletteTruchetDisplayer(w, h, w/40, #1d2536, #3b539b, #d7d6f8, #bccbf6, #2a2867, #496cca);
+    t.setRules(0, 1, 2, 3);
+    t.setRandomRule();
+    texture = t.truchet();
     texture.loadPixels();
-        
-        
+                
     //Blob detection
     blobs = createImage(kw/4, kh/4, RGB);
-    bd = new BlobDetection(blobs.width, blobs.height);
+    fast = new FastBlur(blobs.width, blobs.height, 1);
+    bd   = new BlobDetection(blobs.width, blobs.height);
     bd.setPosDiscrimination(true); //Detect bright blobs
     bd.setThreshold(tt);          //Brightness threshold
     
@@ -104,27 +115,47 @@ void setup()
 void draw()
 {   
     kinect.update();
-    
-    if(debugging) 
-        frame.setTitle( nfc(frameRate, 2) );  
+    backgroundTransitions();    
+    blobDetection();
+    createParticles();
+    waterSimulation();    
+}
+
+
+/**
+ *  Background transitions
+ *  Set a truchet tiling as background and shifts it over time
+ */
+void backgroundTransitions()
+{
     tint(255, bg_alpha < 255f ? bg_alpha++ : bg_alpha);
     image(texture, 0, 0);
-    //Update texture
     if(millis() > current_time + 60000){
-        current_rule = (current_rule + 1) % rules.length;
+        t.setCurrentRule((t.current_rule + 1) % t.rules.length);
         current_time = millis();  
-        texture = truchet(); 
+        texture = t.truchet(); 
         bg_alpha = 0f;       
-    }
-    
-    //Create visitors
+    }  
+}
+
+/**
+ *  Blob detection
+ *  Calculates main blobs in image using BlobDetection library
+ */
+void blobDetection()
+{
     cam = kinect.depthImage();
     blobs.copy(cam, 0, 0, cam.width, cam.height, 0, 0, blobs.width, blobs.height);
-    fastblur(blobs, 2);    
-    bd.computeBlobs(blobs.pixels);
+    fast.blur(blobs);    
+    bd.computeBlobs(blobs.pixels);  
+}
 
-    //Blob detection
-    //Detects main blobs and create particles in its contour
+/**
+ *  createParticles
+ *  instantiate PVectors in blobs contours in order to distort the water
+ */
+void createParticles()
+{
     EdgeVertex p;
     visitors = new ArrayList<PVector>();
     for(int i = 0; i < bd.getBlobNb(); i++) {
@@ -136,9 +167,18 @@ void draw()
             if (p != null) 
                 visitors.add(new PVector(p.x * width, p.y * height + 100));
         }
-    }
+    }  
+}
 
-    //Water effect    
+
+/**
+ *  waterSimulation
+ *  A classic water rippling effect
+ *  Based on 'Processing Water Simulation' by Rodrigo Amaya, ported from the "Java Water Simulation" by Neil Wallis
+ *  @see http://www.openprocessing.org/sketch/43543
+ */
+void waterSimulation()
+{
     loadPixels();
     int tmp = oldind;
     oldind = mapind = newind;
@@ -160,8 +200,8 @@ void draw()
         i++;
     }
     arrayCopy(ripple, 0, pixels, 0, wh);  
-    updatePixels();    
-      
+    updatePixels();  
+    
     //Caculate visitors influence over the ripplemap
     int vx, vy;
     for(PVector v : visitors) {
@@ -171,15 +211,5 @@ void draw()
           for (int x= vx - radius; x < vx + radius; x++) 
             if (y >= 0 && y < h && x >=0 && x < w) 
               ripplemap[oldind + (y*w) + x] += 128;
-    }
-}
-
-void keyPressed(){
-    if(keyCode == UP && tt < 1f){
-            bd.setThreshold(tt+=.05); 
-            println(tt); 
-    } else if (keyCode == DOWN && tt > 0f){
-            bd.setThreshold(tt-=.05); 
-            println(tt); 
-    }  
+    }   
 }
